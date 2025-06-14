@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chi tiết người nổi tiếng</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="min-h-screen text-gray-800 bg-[url('./bg-soft.png')] bg-cover bg-center bg-fixed bg-no-repeat">
+<body class="bg-gradient-to-br from-purple-100 to-white min-h-screen text-gray-800">
   <div class="container mx-auto px-4 py-12">
     <a href="index.html" class="text-purple-700 font-semibold hover:underline">&larr; Quay lại Trang Chủ</a>
-    <div id="celeb-detail" class="mt-8 animate-slide-in"></div>
+    <div id="celeb-detail" class="mt-8"></div>
 
     <!-- Bình luận -->
     <div class="mt-12 px-4 md:px-0">
@@ -21,77 +21,69 @@
   </div>
 
   <script>
-    const BASE_URL = 'https://your-server-name.onrender.com'; // Thay bằng URL thật của bạn
+    const BASE_URL = 'https://starlio.onrender.com'; // hoặc "" nếu dùng chung domain
+    const token = localStorage.getItem('token');
+    const celebId = new URLSearchParams(window.location.search).get('id');
 
     async function loadDetail() {
-      const celebId = new URLSearchParams(window.location.search).get('id');
-      const detailContainer = document.getElementById('celeb-detail');
-      const token = localStorage.getItem('token');
-
-      const [celebRes, meRes] = await Promise.all([
-        fetch(`${BASE_URL}/api/celebs`),
-        token
-          ? fetch(`${BASE_URL}/api/users/me`, {
-              headers: { Authorization: 'Bearer ' + token }
-            }).then(r => r.ok ? r.json() : { ratings: [] })
-          : Promise.resolve({ ratings: [] })
-      ]);
-
-      const celebs = await celebRes.json();
-      const userRatings = meRes.ratings || [];
+      const resCeleb = await fetch(`${BASE_URL}/api/celebs`);
+      const celebs = await resCeleb.json();
       const celeb = celebs.find(c => c._id === celebId);
-      const ratedCeleb = userRatings.find(r => r.celeb === celebId);
+      if (!celeb) return document.getElementById('celeb-detail').innerHTML = '<p class="text-red-500">Không tìm thấy.</p>';
 
-      if (!celeb) {
-        detailContainer.innerHTML = '<p class="text-red-500">Không tìm thấy người nổi tiếng.</p>';
-        return;
-      }
-
-      const average = celeb.ratingCount > 0 ? (celeb.totalRating / celeb.ratingCount) : 0;
-      const ratingStars = [1, 2, 3, 4, 5].map(i => {
-        if (ratedCeleb) {
-          return `<span data-value="${i}" class="star text-2xl ${i <= ratedCeleb.value ? 'text-yellow-400' : 'text-gray-400'}">★</span>`;
-        } else {
-          return `<span data-value="${i}" class="star cursor-pointer text-2xl text-gray-500 hover:text-yellow-400 transition-all">☆</span>`;
+      let userRatings = [], isAdmin = false;
+      try {
+        if (token) {
+          const me = await fetch(`${BASE_URL}/api/users/me`, {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          const json = await me.json();
+          userRatings = json.ratings || [];
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          isAdmin = payload.role === 'admin';
         }
-      }).join('');
+      } catch {}
 
-      detailContainer.innerHTML = `
-        <div class="flex flex-col md:flex-row gap-8 backdrop-blur-sm bg-white/30 p-6 rounded-lg shadow-lg">
-          <div class="md:w-1/3 w-full flex flex-col items-center">
-            <img src="${celeb.image}" class="w-full rounded object-cover max-h-[500px]" alt="${celeb.name}" />
+      const rated = userRatings.find(r => r.celeb === celebId);
+      const avg = celeb.ratingCount > 0 ? (celeb.totalRating / celeb.ratingCount).toFixed(1) : '0.0';
+
+      const ratingStars = [1,2,3,4,5].map(i => 
+        `<span data-value="${i}" class="star text-2xl ${rated && i <= rated.value ? 'text-yellow-400' : 'text-gray-400'} ${!rated && 'cursor-pointer hover:text-yellow-400'}">★</span>`
+      ).join('');
+
+      const html = `
+        <div class="bg-white p-6 rounded shadow-lg flex flex-col md:flex-row gap-6">
+          <div class="md:w-1/3">
+            <img src="${celeb.image}" class="w-full rounded object-cover" />
             <div id="rating-stars" class="mt-4 flex gap-1">${ratingStars}</div>
             <div id="fav-btn-container" class="mt-4"></div>
           </div>
           <div class="flex-1">
             <h1 class="text-3xl font-bold text-purple-800 mb-2">${celeb.name}</h1>
-            <p class="text-lg font-medium text-gray-600 mb-4">${Array.isArray(celeb.profession) ? celeb.profession.join(', ') : celeb.profession}</p>
-            <p class="text-gray-700 leading-relaxed whitespace-pre-line">${celeb.description}</p>
-            <div id="edit-btn-container" class="mt-4"></div>
+            <p class="text-lg font-medium text-gray-600 mb-2">${Array.isArray(celeb.profession) ? celeb.profession.join(', ') : celeb.profession}</p>
+            <p class="text-sm text-gray-500 mb-2">⭐ Trung bình: ${avg} / 5 (${celeb.ratingCount} đánh giá)</p>
+            <p class="text-gray-700 whitespace-pre-line">${celeb.description || ''}</p>
+            ${isAdmin ? `<a href="edit.html?id=${celebId}" class="inline-block mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">✏️ Sửa thông tin</a>` : ''}
           </div>
         </div>
       `;
+      document.getElementById('celeb-detail').innerHTML = html;
 
-      if (!ratedCeleb) {
+      if (!rated && token) {
         document.querySelectorAll('.star').forEach(star => {
           star.addEventListener('click', async () => {
-            if (!token) return alert('Bạn cần đăng nhập để đánh giá.');
-            const value = parseInt(star.dataset.value);
-            const res = await fetch(`${BASE_URL}/api/celebs/${celebId}/rate`, {
+            const val = parseInt(star.dataset.value);
+            const r = await fetch(`${BASE_URL}/api/celebs/${celebId}/rate`, {
               method: 'POST',
               headers: {
-                Authorization: 'Bearer ' + token,
+                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ rating: value })
+              body: JSON.stringify({ rating: val })
             });
-            if (res.ok) {
-              alert('Cảm ơn bạn đã đánh giá!');
-              location.reload();
-            } else {
-              const result = await res.json();
-              alert(result.message || 'Không thể gửi đánh giá.');
-            }
+            const js = await r.json();
+            alert(js.message || 'Đã đánh giá!');
+            location.reload();
           });
         });
       }
@@ -99,67 +91,43 @@
       // Yêu thích
       let isFav = false;
       try {
-        const favRes = await fetch(`${BASE_URL}/api/users/favorites`, {
+        const favs = await fetch(`${BASE_URL}/api/users/favorites`, {
           headers: { Authorization: 'Bearer ' + token }
-        });
-        const favs = await favRes.json();
-        isFav = favs.some(c => c._id === celebId);
-      } catch (err) {
-        console.warn('Không kiểm tra được trạng thái yêu thích:', err);
-      }
-
+        }).then(r => r.json());
+        isFav = favs.some(f => f._id === celebId);
+      } catch {}
       const favBtn = document.createElement('button');
-      favBtn.innerHTML = isFav ? '❤️ Đã yêu thích' : '🤍 Thêm vào yêu thích';
-      favBtn.className = 'px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 hover:animate-bounce';
+      favBtn.innerText = isFav ? '❤️ Đã yêu thích' : '🤍 Thêm vào yêu thích';
+      favBtn.className = 'px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600';
       favBtn.onclick = async () => {
-        if (!token) return alert('Bạn cần đăng nhập trước');
-        const res = await fetch(`${BASE_URL}/api/users/favorites/${encodeURIComponent(celebId)}`, {
+        const r = await fetch(`${BASE_URL}/api/users/favorites/${celebId}`, {
           method: 'POST',
           headers: { Authorization: 'Bearer ' + token }
         });
-        if (res.ok) {
-          isFav = !isFav;
-          favBtn.innerHTML = isFav ? '❤️ Đã yêu thích' : '🤍 Thêm vào yêu thích';
-        } else {
-          alert('Không thể cập nhật yêu thích');
-        }
+        const js = await r.json();
+        alert('Đã cập nhật yêu thích');
+        location.reload();
       };
       document.getElementById('fav-btn-container').appendChild(favBtn);
-
-      // Nút chỉnh sửa nếu là admin
-      try {
-        const payload = token && JSON.parse(atob(token.split('.')[1]));
-        if (payload?.role === 'admin') {
-          const editBtn = document.createElement('a');
-          editBtn.href = `edit.html?id=${celebId}`;
-          editBtn.textContent = '✏️ Sửa thông tin';
-          editBtn.className = 'inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2';
-          document.getElementById('edit-btn-container').appendChild(editBtn);
-        }
-      } catch {}
     }
 
     loadDetail();
 
+    // Bình luận (demo)
     const comments = [];
     function submitComment() {
-      const input = document.getElementById('comment-input');
-      const text = input.value.trim();
-      if (!text) return;
-      const time = new Date().toLocaleString();
-      comments.unshift({ text, time });
-      input.value = '';
+      const val = document.getElementById('comment-input').value.trim();
+      if (!val) return;
+      comments.unshift({ text: val, time: new Date().toLocaleString() });
+      document.getElementById('comment-input').value = '';
       renderComments();
     }
-
     function renderComments() {
       const list = document.getElementById('comment-list');
       list.innerHTML = comments.map(c => `
-        <div class="bg-white p-3 rounded shadow border">
-          <p class="text-gray-800 text-sm">${c.text}</p>
-          <p class="text-gray-400 text-xs mt-1">${c.time}</p>
-        </div>
-      `).join('');
+        <div class="bg-white p-3 rounded shadow">
+          <p>${c.text}</p><p class="text-xs text-gray-500 mt-1">${c.time}</p>
+        </div>`).join('');
     }
   </script>
 </body>
