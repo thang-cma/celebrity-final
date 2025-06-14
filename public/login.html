@@ -27,12 +27,13 @@
     </button>
     <p id="error" class="text-red-500 text-sm text-center hidden">Sai tên đăng nhập hoặc mật khẩu!</p>
     <p style="margin-top: 10px; text-align: center; font-size: 14px;">
-  Chưa có tài khoản? <a href="register.html" style="color: purple; text-decoration: underline;">Đăng ký ngay</a>
-</p>
-  
+      Chưa có tài khoản? <a href="register.html" style="color: purple; text-decoration: underline;">Đăng ký ngay</a>
+    </p>
   </div>
 
   <script>
+    const API_BASE = 'https://starlio.onrender.com'; // 🔁 Sửa tại đây
+
     async function login() {
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value.trim();
@@ -46,7 +47,7 @@
       }
 
       try {
-        const res = await fetch('http://localhost:3000/api/auth/login', {
+        const res = await fetch(`${API_BASE}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
