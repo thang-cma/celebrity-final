@@ -16,9 +16,11 @@
     async function loadRank() {
       try {
         const res = await fetch('/api/celebs/rank');
-        const data = await res.json();
+        if (!res.ok) throw new Error('Không thể tải dữ liệu');
 
+        const data = await res.json();
         const container = document.getElementById('ranking-list');
+
         container.innerHTML = data.map((celeb, index) => {
           const avgRating = celeb.ratingCount > 0
             ? (celeb.totalRating / celeb.ratingCount).toFixed(1)
