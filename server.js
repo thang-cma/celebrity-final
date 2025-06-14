@@ -11,7 +11,6 @@ const path = require('path');
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'mysecret123';
 
-// Multer cấu hình upload ảnh
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => {
@@ -22,7 +21,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Middleware xác thực token
 function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -43,21 +41,18 @@ function adminOnly(req, res, next) {
   next();
 }
 
-// Cấu hình Express
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Kết nối MongoDB
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => console.log('✅ Đã kết nối MongoDB'))
   .catch(err => console.error('❌ Lỗi kết nối MongoDB:', err));
 
-// Mongoose models
 const User = mongoose.model('User', new mongoose.Schema({
   username: String,
   password: String,
@@ -78,7 +73,6 @@ const Celeb = mongoose.model('Celeb', {
   ratingCount: { type: Number, default: 0 }
 });
 
-// Tạo admin mặc định
 (async () => {
   const exist = await User.findOne({ username: 'admin' });
   if (!exist) {
@@ -88,8 +82,7 @@ const Celeb = mongoose.model('Celeb', {
   }
 })();
 
-// Các route API ở đây (tương tự như của bạn — giữ nguyên, đã chuẩn)
-
+// Auth
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
   const user = await User.findOne({ username });
@@ -117,6 +110,7 @@ app.get('/api/users/me', authMiddleware, async (req, res) => {
   res.json({ ratings: user.ratings || [] });
 });
 
+// Celebs CRUD
 app.get('/api/celebs', async (req, res) => {
   const celebs = await Celeb.find();
   res.json(celebs);
@@ -138,19 +132,55 @@ app.post('/api/celebs', authMiddleware, adminOnly, upload.single('image'), async
   res.status(201).json(celeb);
 });
 
-// update, delete, favorites, ratings giống như bạn đã viết, giữ nguyên
+app.put('/api/celebs/:id', authMiddleware, adminOnly, async (req, res) => {
+  const updated = await Celeb.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  res.json(updated);
+});
 
-// Route cho giao diện reset đánh giá
+app.delete('/api/celebs/:id', authMiddleware, adminOnly, async (req, res) => {
+  await Celeb.findByIdAndDelete(req.params.id);
+  res.json({ message: 'Đã xoá' });
+});
+
+// ⭐ ROUTE MỚI THÊM: YÊU THÍCH
+app.post('/api/users/favorites/:celebId', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username });
+    const celebId = req.params.celebId;
+    const index = user.favorites.indexOf(celebId);
+    if (index > -1) user.favorites.splice(index, 1);
+    else user.favorites.push(celebId);
+    await user.save();
+    res.json({ favorites: user.favorites });
+  } catch (err) {
+    res.status(500).json({ error: 'Không thể cập nhật yêu thích.' });
+  }
+});
+
+app.get('/api/users/favorites', authMiddleware, async (req, res) => {
+  const user = await User.findOne({ username: req.user.username }).populate('favorites');
+  res.json(user.favorites);
+});
+
+// Reset ratings
+app.post('/api/celebs/reset-ratings', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    await Celeb.updateMany({}, { totalRating: 0, ratingCount: 0 });
+    await User.updateMany({}, { ratings: [] });
+    res.json({ message: 'Đã reset toàn bộ đánh giá' });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi khi reset đánh giá' });
+  }
+});
+
 app.get('/admin/reset-ratings', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'reset.html'));
 });
 
-// Giao diện gốc
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Khởi động
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server đang chạy tại http://localhost:${PORT}`);

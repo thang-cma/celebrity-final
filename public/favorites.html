@@ -15,39 +15,44 @@
   </div>
 
   <script>
-  async function loadFavorites() {
-    const container = document.getElementById('favorites-container');
-    const res = await fetch('http://localhost:3000/api/users/favorites', {
-      headers: {
-        'Authorization': 'Bearer ' + localStorage.getItem('token')
+    const BASE_URL = 'https://your-server-name.onrender.com'; // ⚠️ Thay bằng URL thật của bạn
+
+    async function loadFavorites() {
+      const container = document.getElementById('favorites-container');
+      try {
+        const res = await fetch(`${BASE_URL}/api/users/favorites`, {
+          headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('token')
+          }
+        });
+
+        if (!res.ok) {
+          container.innerHTML = '<p class="text-red-500">Không thể lấy danh sách yêu thích.</p>';
+          return;
+        }
+
+        const favCelebs = await res.json();
+
+        if (favCelebs.length === 0) {
+          container.innerHTML = '<p class="text-center col-span-3 text-gray-600">Bạn chưa yêu thích ai cả.</p>';
+          return;
+        }
+
+        container.innerHTML = favCelebs.map(c => `
+          <a href="detail.html?id=${c._id}" class="block bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition">
+            <img src="${c.image}" class="w-full h-64 object-cover" alt="${c.name}">
+            <div class="p-4">
+              <h3 class="text-xl font-semibold text-purple-700">${c.name}</h3>
+              <p class="text-sm text-gray-600">${Array.isArray(c.profession) ? c.profession.join(', ') : c.profession}</p>
+            </div>
+          </a>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = '<p class="text-red-500">Lỗi kết nối máy chủ.</p>';
       }
-    });
-
-    if (!res.ok) {
-      container.innerHTML = '<p class="text-red-500">Không thể lấy danh sách yêu thích.</p>';
-      return;
     }
 
-    const favCelebs = await res.json();
-
-    if (favCelebs.length === 0) {
-      container.innerHTML = '<p class="text-center col-span-3 text-gray-600">Bạn chưa yêu thích ai cả.</p>';
-      return;
-    }
-
-    container.innerHTML = favCelebs.map(c => `
-      <a href="detail.html?id=${c._id}" class="block bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition">
-        <img src="${c.image}" class="w-full h-64 object-cover" alt="${c.name}">
-        <div class="p-4">
-          <h3 class="text-xl font-semibold text-purple-700">${c.name}</h3>
-          <p class="text-sm text-gray-600">${c.profession}</p>
-        </div>
-      </a>
-    `).join('');
-  }
-
-  loadFavorites();
-</script>
-
+    loadFavorites();
+  </script>
 </body>
 </html>
