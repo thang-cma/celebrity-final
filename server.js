@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 // ✅ Full server.js đã sửa
 const express = require('express');
 const mongoose = require('mongoose');
@@ -50,7 +52,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Kết nối MongoDB
-mongoose.connect('mongodb://127.0.0.1:27017/celebs');
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
 // Mongoose models
 const User = mongoose.model('User', new mongoose.Schema({
