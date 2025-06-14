@@ -82,7 +82,6 @@ const Celeb = mongoose.model('Celeb', {
   }
 })();
 
-// Auth
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
   const user = await User.findOne({ username });
@@ -110,7 +109,6 @@ app.get('/api/users/me', authMiddleware, async (req, res) => {
   res.json({ ratings: user.ratings || [] });
 });
 
-// Celebs CRUD
 app.get('/api/celebs', async (req, res) => {
   const celebs = await Celeb.find();
   res.json(celebs);
@@ -142,7 +140,6 @@ app.delete('/api/celebs/:id', authMiddleware, adminOnly, async (req, res) => {
   res.json({ message: 'Đã xoá' });
 });
 
-// ⭐ ROUTE MỚI THÊM: YÊU THÍCH
 app.post('/api/users/favorites/:celebId', authMiddleware, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.user.username });
@@ -162,7 +159,55 @@ app.get('/api/users/favorites', authMiddleware, async (req, res) => {
   res.json(user.favorites);
 });
 
-// Reset ratings
+app.post('/api/celebs/:id/rate', authMiddleware, async (req, res) => {
+  const user = await User.findOne({ username: req.user.username });
+  const celebId = req.params.id;
+  const rating = req.body.rating;
+
+  if (!rating || rating < 1 || rating > 5) {
+    return res.status(400).json({ message: 'Giá trị đánh giá không hợp lệ.' });
+  }
+
+  const celeb = await Celeb.findById(celebId);
+  if (!celeb) {
+    return res.status(404).json({ message: 'Không tìm thấy người nổi tiếng.' });
+  }
+
+  const existingRating = user.ratings.find(r => r.celeb.toString() === celebId);
+
+  if (existingRating) {
+    celeb.totalRating -= existingRating.value;
+    existingRating.value = rating;
+  } else {
+    user.ratings.push({ celeb: celebId, value: rating });
+    celeb.ratingCount += 1;
+  }
+
+  celeb.totalRating += rating;
+  await user.save();
+  await celeb.save();
+  res.json({ message: 'Đánh giá thành công' });
+});
+
+app.get('/api/celebs/rank', async (req, res) => {
+  const users = await User.find();
+  const celebs = await Celeb.find();
+  const favMap = {};
+
+  users.forEach(u => {
+    u.favorites.forEach(id => {
+      favMap[id] = (favMap[id] || 0) + 1;
+    });
+  });
+
+  const celebsWithFav = celebs.map(c => ({
+    ...c.toObject(),
+    favoritesCount: favMap[c._id] || 0
+  })).sort((a, b) => b.favoritesCount - a.favoritesCount);
+
+  res.json(celebsWithFav);
+});
+
 app.post('/api/celebs/reset-ratings', authMiddleware, adminOnly, async (req, res) => {
   try {
     await Celeb.updateMany({}, { totalRating: 0, ratingCount: 0 });
