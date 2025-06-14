@@ -13,7 +13,6 @@
     <input type="text" id="name" placeholder="Tên" class="w-full mb-2 px-3 py-2 border rounded" />
     <input type="text" id="profession" placeholder="Nghề nghiệp" class="w-full mb-2 px-3 py-2 border rounded" />
     <textarea id="description" placeholder="Mô tả chi tiết" class="w-full mb-2 px-3 py-2 border rounded"></textarea>
-
     <input type="text" id="image" placeholder="Link ảnh (nếu muốn đổi)" class="w-full mb-4 px-3 py-2 border rounded" />
 
     <div class="flex justify-between">
@@ -27,7 +26,7 @@
     const id = params.get('id');
 
     async function loadData() {
-      const res = await fetch('http://localhost:3000/api/celebs');
+      const res = await fetch('https://starlio.onrender.com/api/celebs');
       const celebs = await res.json();
       const celeb = celebs.find(c => c._id === id);
       if (!celeb) return alert('Không tìm thấy người nổi tiếng');
@@ -47,7 +46,7 @@
         image: document.getElementById('image').value.trim()
       };
 
-      const res = await fetch(`http://localhost:3000/api/celebs/${id}`, {
+      const res = await fetch(`https://starlio.onrender.com/api/celebs/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
